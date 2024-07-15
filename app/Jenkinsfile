@@ -57,7 +57,10 @@ pipeline {
                '''
             }
         }
-        
-        
+         stage('create') {
+            steps {
+        echo 'creating...'
+    }
+}
     }
 }
