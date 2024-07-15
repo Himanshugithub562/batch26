@@ -1,1 +1,63 @@
+pipeline {
+    agent any
+    stages {
+        stage('git checkout') {
+            steps {
+                git branch: "$branch", url: 'https://github.com/Himanshugithub562/student-ui.git'
+            }
+        }
+        
+        stage('docker stage') {
+            steps {
+                sh ''' apt update && apt install docker.io -y && apt install -y awscli
+                  docker build -t demo .'''
+            }
+        }
+        stage('make aws dir') {
+            steps {
+                sh '''
+                mkdir -p ~/.aws
+                touch ~/.aws/credentials
+                
+                '''
+            }
+        }
+        stage('aws config') {
+            steps {
+               withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-cred', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+       sh '''  cat << EOF > ~/.aws/credentials
+                [default]
+                aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+                aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+                 '''
+                 sh ''' aws s3 ls  '''
+}
+            }
+        }
+        stage('docker push') {
+            steps {
+                sh '''
+                aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 590183980040.dkr.ecr.us-east-2.amazonaws.com                 
+                 docker tag demo 590183980040.dkr.ecr.us-east-2.amazonaws.com/student-ui:$BUILD_ID
+                 docker push 590183980040.dkr.ecr.us-east-2.amazonaws.com/student-ui:$BUILD_ID
+                 docker system prune -a -f '''
+            }
+        }
+        stage('manifest checkout') {
+            steps {
+               checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Himanshugithub562/kubernetes-cd.git']])
+            }
+        }
+        stage('update tag') {
+            steps {
+               sh '''
+               ls -al
+               sed -i "s/student-ui:.*/student-ui:$BUILD_ID/" dev/back.yaml
 
+               '''
+            }
+        }
+        
+        
+    }
+}
